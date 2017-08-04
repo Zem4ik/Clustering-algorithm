@@ -18,20 +18,17 @@ public class Pair<K, V> {
     public boolean equals(Object other) {
         if (other instanceof Pair) {
             Pair otherPair = (Pair) other;
-            return
-                    ((  this.first == otherPair.first ||
-                            ( this.first != null && otherPair.first != null &&
-                                    this.first.equals(otherPair.first))) &&
-                            (  this.second == otherPair.second ||
-                                    ( this.second != null && otherPair.second != null &&
-                                            this.second.equals(otherPair.second))) );
+            return ((this.first == otherPair.first ||
+                    (this.first != null && otherPair.first != null &&
+                            this.first.equals(otherPair.first))) &&
+                    (this.second == otherPair.second ||
+                            (this.second != null && otherPair.second != null &&
+                                    this.second.equals(otherPair.second))));
         }
-
         return false;
     }
 
-    public String toString()
-    {
+    public String toString() {
         return "(" + first + ", " + second + ")";
     }
 
@@ -39,15 +36,19 @@ public class Pair<K, V> {
         return first;
     }
 
-    public void setFirst(K first) {
+    public K setFirst(K first) {
+        K oldFirst = this.first;
         this.first = first;
+        return oldFirst;
     }
 
     public V getSecond() {
         return second;
     }
 
-    public void setSecond(V second) {
+    public V setSecond(V second) {
+        V oldSecond = this.second;
         this.second = second;
+        return oldSecond;
     }
 }

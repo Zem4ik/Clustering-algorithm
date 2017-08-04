@@ -3,7 +3,6 @@ import java.util.*;
 
 public class Test {
     private static String[] FILE_PATHS = {
-//            "test.txt",
             "user-ct-test-collection-01.txt",
 //            "user-ct-test-collection-02.txt",
 //            "user-ct-test-collection-03.txt",
@@ -28,15 +27,18 @@ public class Test {
         for (String filePath : FILE_PATHS) {
             processFile(filePath);
         }
+        long summary = 0;
         Pair<String, Double>[] similarQueriesArray;
         BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(new File("results.txt"))));
         for (Map.Entry<String, Map<String, Integer>> entry : queries.entrySet()) {
             Set<Pair<String, Double>> similarQueries = getSimilarQueries(entry);
             similarQueriesArray = similarQueries.stream().toArray(Pair[]::new);
-            Arrays.sort(similarQueriesArray, Comparator.comparing(Pair::getSecond));
+            Arrays.sort(similarQueriesArray, Collections.reverseOrder(Comparator.comparing(Pair::getSecond)));
             bufferedWriter.write(entry.getKey() + " " + 1.0);
             bufferedWriter.newLine();
-            for (Pair<String, Double> pair : similarQueries) {
+            System.out.println(Integer.toString(similarQueriesArray.length));
+            summary += similarQueriesArray.length;
+            for (Pair<String, Double> pair : similarQueriesArray) {
                 bufferedWriter.write(pair.getFirst() + " " + pair.getSecond());
                 bufferedWriter.newLine();
             }
@@ -44,8 +46,9 @@ public class Test {
         }
         bufferedWriter.close();
 
-        System.out.println(queries.size());
-        System.out.println(sites.size());
+        System.out.println("summary: " + summary);
+        System.out.println("Total queries: " + queries.size());
+        System.out.println("Total sites: " + sites.size());
         System.out.println("working time: " + (System.currentTimeMillis() - startTime) / 1000.0 + " sec");
     }
 

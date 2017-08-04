@@ -6,8 +6,7 @@ import java.util.*;
 public class QueryCollectionParser {
     private BufferedReader bufferedReader;
 
-    public QueryCollectionParser() {
-    }
+    public QueryCollectionParser() {}
 
     public void openFile(String filePath) throws IOException {
         File file = new File(filePath);
