@@ -1,3 +1,5 @@
+package Query;
+
 import java.time.LocalDateTime;
 
 public interface Query {

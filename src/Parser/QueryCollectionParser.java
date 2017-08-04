@@ -1,7 +1,11 @@
+package Parser;
+
+import Query.*;
+
 import java.io.*;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.*;
 
 public class QueryCollectionParser {
     private BufferedReader bufferedReader;

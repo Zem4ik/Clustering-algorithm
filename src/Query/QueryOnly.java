@@ -1,9 +1,8 @@
-import java.time.LocalDateTime;
+package Query;
+
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.time.temporal.TemporalAccessor;
-import java.util.StringTokenizer;
 
 public class QueryOnly implements Query {
 
@@ -12,7 +11,7 @@ public class QueryOnly implements Query {
     private LocalDateTime queryTime;
 
     //TODO: specify exceptions
-    QueryOnly(String inputString) throws IllegalArgumentException {
+    public QueryOnly(String inputString) throws IllegalArgumentException {
         String[] splitteredString = inputString.trim().split("\t");
         try {
             setAnonId(Integer.parseInt(splitteredString[0]));
@@ -23,7 +22,7 @@ public class QueryOnly implements Query {
         }
     }
 
-    QueryOnly() {
+    public QueryOnly() {
         anonID = 0;
         query = null;
         queryTime = null;

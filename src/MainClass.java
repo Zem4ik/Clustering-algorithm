@@ -1,7 +1,10 @@
+import Parser.QueryCollectionParser;
+import Query.*;
+
 import java.io.*;
 import java.util.*;
 
-public class Test {
+public class MainClass {
     private static String[] FILE_PATHS = {
             "user-ct-test-collection-01.txt",
 //            "user-ct-test-collection-02.txt",
@@ -19,26 +22,26 @@ public class Test {
     private static Map<String, Map<String, Integer>> sites;
 
     public static void main(String[] args) throws IOException {
-        //writeTestFile();
-
+        if (args == null || args.length == 0) {
+            args = FILE_PATHS;
+        }
         long startTime = System.currentTimeMillis();
         queries = new HashMap<>();
         sites = new HashMap<>();
-        for (String filePath : FILE_PATHS) {
+        for (String filePath : args) {
             processFile(filePath);
         }
         long summary = 0;
         Pair<String, Double>[] similarQueriesArray;
         BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(new File("results.txt"))));
         for (Map.Entry<String, Map<String, Integer>> entry : queries.entrySet()) {
-            Set<Pair<String, Double>> similarQueries = getSimilarQueries(entry);
-            similarQueriesArray = similarQueries.stream().toArray(Pair[]::new);
-            Arrays.sort(similarQueriesArray, Collections.reverseOrder(Comparator.comparing(Pair::getSecond)));
+            SortedSet<Pair<String, Double>> similarQueries = getSimilarQueries(entry);
             bufferedWriter.write(entry.getKey() + " " + 1.0);
             bufferedWriter.newLine();
-            System.out.println(Integer.toString(similarQueriesArray.length));
-            summary += similarQueriesArray.length;
-            for (Pair<String, Double> pair : similarQueriesArray) {
+            summary += similarQueries.size();
+            for (int i = 0; i < 10 && similarQueries.size() > 0; ++i) {
+                Pair<String, Double> pair = similarQueries.last();
+                similarQueries.remove(pair);
                 bufferedWriter.write(pair.getFirst() + " " + pair.getSecond());
                 bufferedWriter.newLine();
             }
@@ -59,6 +62,7 @@ public class Test {
             queryCollectionParser.openFile(filePath);
         } catch (IOException e) {
             System.err.println("Can't open file " + filePath);
+            return;
         }
         Query query = new QueryOnly();
         int ClickThrough_number = 0;
@@ -83,8 +87,8 @@ public class Test {
             }
         }
         System.out.println("statistic for file: " + filePath);
-        System.out.println("ClickThrough: " + ClickThrough_number);
-        System.out.println("QueryOnly: " + QueryOnly_number);
+        System.out.println("Query.ClickThrough: " + ClickThrough_number);
+        System.out.println("Query.QueryOnly: " + QueryOnly_number);
         System.out.println("Working time: " + (System.currentTimeMillis() - startTime) / 1000.0 + " sec");
         System.out.println();
     }
@@ -119,8 +123,8 @@ public class Test {
         return sameDocuments / (firstDocuments + secondDocuments);
     }
 
-    private static Set<Pair<String, Double>> getSimilarQueries(Map.Entry<String, Map<String, Integer>> startingEntry) {
-        Set<Pair<String, Double>> resultSet = new HashSet<>();
+    private static SortedSet<Pair<String, Double>> getSimilarQueries(Map.Entry<String, Map<String, Integer>> startingEntry) {
+        SortedSet<Pair<String, Double>> resultSet = new TreeSet<>(Comparator.comparing(Pair::getSecond));
         Set<String> neighboringQueries = getNeighboringQueries(startingEntry);
         for (String neighboringQuery : neighboringQueries) {
             double similarity = calculateSimilarity(startingEntry.getValue(), queries.get(neighboringQuery));
@@ -131,28 +135,4 @@ public class Test {
         return resultSet;
     }
 
-    private static void writeTestFile() throws IOException {
-        BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(new File("test.txt"))));
-        bufferedWriter.write("AnonID\tQuery\tQueryTime\tItemRank\tClickURL");
-        bufferedWriter.newLine();
-        for (int i = 0; i < 10; ++i) {
-            bufferedWriter.write("1\ta\t2006-03-01 07:17:12\t1\td2");
-            bufferedWriter.newLine();
-        }
-        for (int i = 0; i < 1000; ++i) {
-            bufferedWriter.write("1\ta\t2006-03-01 07:17:12\t1\td1");
-            bufferedWriter.newLine();
-            bufferedWriter.write("1\tb\t2006-03-01 07:17:12\t1\td2");
-            bufferedWriter.newLine();
-            bufferedWriter.write("1\tb\t2006-03-01 07:17:12\t1\td3");
-            bufferedWriter.newLine();
-        }
-        for (int i = 0; i < 100; ++i) {
-            bufferedWriter.write("1\tc\t2006-03-01 07:17:12\t1\td3");
-            bufferedWriter.newLine();
-        }
-        bufferedWriter.write("1\tc\t2006-03-01 07:17:12\t1\td2");
-        bufferedWriter.newLine();
-        bufferedWriter.close();
-    }
 }
