@@ -11,7 +11,6 @@ public class Pair<K, V> {
     public int hashCode() {
         int hashFirst = first != null ? first.hashCode() : 0;
         int hashSecond = second != null ? second.hashCode() : 0;
-
         return (hashFirst + hashSecond) * hashSecond + hashFirst;
     }
 

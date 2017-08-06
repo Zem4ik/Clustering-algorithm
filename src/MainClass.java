@@ -3,6 +3,8 @@ import Query.*;
 
 import java.io.*;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class MainClass {
     private static String[] FILE_PATHS = {
@@ -20,6 +22,7 @@ public class MainClass {
 
     private static Map<String, Map<String, Integer>> queries;
     private static Map<String, Map<String, Integer>> sites;
+    private static Map<String, ArrayList<String>> clusters;
 
     public static void main(String[] args) throws IOException {
         if (args == null || args.length == 0) {
@@ -28,28 +31,38 @@ public class MainClass {
         long startTime = System.currentTimeMillis();
         queries = new HashMap<>();
         sites = new HashMap<>();
+        clusters = new HashMap<>();
         for (String filePath : args) {
             processFile(filePath);
         }
-        long summary = 0;
-        Pair<String, Double>[] similarQueriesArray;
-        BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(new File("results.txt"))));
+
         for (Map.Entry<String, Map<String, Integer>> entry : queries.entrySet()) {
-            SortedSet<Pair<String, Double>> similarQueries = getSimilarQueries(entry);
-            bufferedWriter.write(entry.getKey() + " " + 1.0);
+            clusters.put(entry.getKey(), new ArrayList<>());
+        }
+
+        while (doIteration()) {
+            if ((clusters.size() / 1000.0) % 1 == 0) {
+                System.out.println(clusters.size() + " time: " +
+                        (System.currentTimeMillis() - startTime) / 1000.0 + " sec");
+            }
+        }
+
+        BufferedWriter bufferedWriter = new BufferedWriter(
+                new OutputStreamWriter(new FileOutputStream(new File("results.txt")), "UTF-8"));
+
+        queries.clear();
+        sites.clear();
+        for (Map.Entry<String, ArrayList<String>> entry : clusters.entrySet()) {
+            bufferedWriter.write(entry.getKey());
             bufferedWriter.newLine();
-            summary += similarQueries.size();
-            for (int i = 0; i < 10 && similarQueries.size() > 0; ++i) {
-                Pair<String, Double> pair = similarQueries.last();
-                similarQueries.remove(pair);
-                bufferedWriter.write(pair.getFirst() + " " + pair.getSecond());
+            for (String query : entry.getValue()) {
+                bufferedWriter.write(query);
                 bufferedWriter.newLine();
             }
             bufferedWriter.newLine();
         }
         bufferedWriter.close();
 
-        System.out.println("summary: " + summary);
         System.out.println("Total queries: " + queries.size());
         System.out.println("Total sites: " + sites.size());
         System.out.println("working time: " + (System.currentTimeMillis() - startTime) / 1000.0 + " sec");
@@ -93,14 +106,101 @@ public class MainClass {
         System.out.println();
     }
 
-    private static Set<String> getNeighboringQueries(Map.Entry<String, Map<String, Integer>> startingEntry) {
+    private static boolean doIteration() {
+        Pair<Pair<String, String>, Double> resultPair = getMostSimilarVertex(queries, sites);
+
+        Pair<String, String> queriesPair = resultPair.getFirst();
+        double maxSimilarity = resultPair.getSecond();
+        if (maxSimilarity < 1) System.out.println(maxSimilarity);
+
+        if (maxSimilarity == -1 || maxSimilarity < 0.5) {
+            return false;
+        }
+
+        final String finalSecondString = queriesPair.getSecond();
+        clusters.compute(queriesPair.getFirst(), (k, v) -> {
+            ArrayList<String> arrayList = clusters.remove(finalSecondString);
+            if (arrayList != null) {
+                v.addAll(arrayList);
+            }
+            v.add(finalSecondString);
+            return v;
+        });
+
+        uniteVertices(queries, sites, queriesPair.getFirst(), queriesPair.getSecond());
+
+        resultPair = getMostSimilarVertex(sites, queries);
+        uniteVertices(sites, queries, resultPair.getFirst().getFirst(), resultPair.getFirst().getSecond());
+        return true;
+    }
+
+    private static void uniteVertices(Map<String, Map<String, Integer>> firstMap,
+                               Map<String, Map<String, Integer>> secondMap,
+                               String firstString,
+                               String secondString) {
+        Set<String> connectedWithFirst = firstMap.get(firstString).keySet();
+        Set<String> connectedWithSecond = firstMap.get(secondString).keySet();
+
+        List<String> connectedWithBoth = new ArrayList<>(connectedWithFirst);
+        connectedWithBoth.retainAll(connectedWithSecond);
+
+        List<String> connectedWithSecondOnly = new ArrayList<>(connectedWithSecond);
+        connectedWithSecondOnly.removeAll(connectedWithFirst);
+
+        for (String vertex : connectedWithBoth) {
+            Map<String, Integer> map = secondMap.get(vertex);
+            map.compute(firstString, (k, v) -> v + map.remove(secondString));
+        }
+        for (String vertex : connectedWithSecondOnly) {
+            Map<String, Integer> map = secondMap.get(vertex);
+            map.put(firstString, map.remove(secondString));
+        }
+
+        Map<String, Integer> newMap = Stream.of(firstMap.get(firstString), firstMap.get(secondString))
+                .map(Map::entrySet)
+                .flatMap(Collection::stream)
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        Map.Entry::getValue,
+                        Integer::sum,
+                        HashMap::new
+                ));
+        firstMap.remove(secondString);
+        firstMap.put(firstString, newMap);
+    }
+
+    private static Pair<Pair<String, String>, Double>
+    getMostSimilarVertex(Map<String, Map<String, Integer>> firstMap,
+                         Map<String, Map<String, Integer>> secondMap) {
+        Pair<String, String> pair = null;
+        double maxSimilarity = -1;
+        for (Map.Entry<String, Map<String, Integer>> startingEntry : firstMap.entrySet()) {
+            Set<String> neighboringQueries = getNeighboringQueries(startingEntry, secondMap);
+            for (String neighboringQuery : neighboringQueries) {
+                double similarity = calculateSimilarity(startingEntry.getValue(), firstMap.get(neighboringQuery));
+                if (pair == null) {
+                    pair = new Pair<>(startingEntry.getKey(), neighboringQuery);
+                    maxSimilarity = similarity;
+                } else if (maxSimilarity < similarity) {
+                    pair.setFirst(startingEntry.getKey());
+                    pair.setSecond(neighboringQuery);
+                    maxSimilarity = similarity;
+                }
+                if (maxSimilarity == 1) return  new Pair<>(pair, maxSimilarity);
+            }
+        }
+        return new Pair<>(pair, maxSimilarity);
+    }
+
+    private static Set<String> getNeighboringQueries(Map.Entry<String, Map<String, Integer>> startingEntry,
+                                                     Map<String, Map<String, Integer>> secondMap) {
         Set<String> neighboringQueries = new HashSet<>();
         Map<String, Integer> map = startingEntry.getValue();
-        for (Map.Entry<String, Integer> queryEntry : map.entrySet()) {
-            for (Map.Entry<String, Integer> siteEntry : sites.get(queryEntry.getKey()).entrySet()) {
-                if (!siteEntry.getKey().equals(startingEntry.getKey()) &&
-                        !neighboringQueries.contains(siteEntry.getKey())) {
-                    neighboringQueries.add(siteEntry.getKey());
+        for (Map.Entry<String, Integer> firstEntry : map.entrySet()) {
+            for (Map.Entry<String, Integer> secondEntry : secondMap.get(firstEntry.getKey()).entrySet()) {
+                if (!secondEntry.getKey().equals(startingEntry.getKey()) &&
+                        !neighboringQueries.contains(secondEntry.getKey())) {
+                    neighboringQueries.add(secondEntry.getKey());
                 }
             }
         }
@@ -123,16 +223,17 @@ public class MainClass {
         return sameDocuments / (firstDocuments + secondDocuments);
     }
 
-    private static SortedSet<Pair<String, Double>> getSimilarQueries(Map.Entry<String, Map<String, Integer>> startingEntry) {
-        SortedSet<Pair<String, Double>> resultSet = new TreeSet<>(Comparator.comparing(Pair::getSecond));
-        Set<String> neighboringQueries = getNeighboringQueries(startingEntry);
-        for (String neighboringQuery : neighboringQueries) {
-            double similarity = calculateSimilarity(startingEntry.getValue(), queries.get(neighboringQuery));
-            if (similarity > 0.001) {
-                resultSet.add(new Pair<>(neighboringQuery, similarity));
-            }
-        }
-        return resultSet;
-    }
+//    @Deprecated
+//    private static SortedSet<Pair<String, Double>> getSimilarQueries(Map.Entry<String, Map<String, Integer>> startingEntry) {
+//        SortedSet<Pair<String, Double>> resultSet = new TreeSet<>(Comparator.comparing(Pair::getSecond));
+//        Set<String> neighboringQueries = getNeighboringQueries(startingEntry);
+//        for (String neighboringQuery : neighboringQueries) {
+//            double similarity = calculateSimilarity(startingEntry.getValue(), queries.get(neighboringQuery));
+//            if (similarity > 0.001) {
+//                resultSet.add(new Pair<>(neighboringQuery, similarity));
+//            }
+//        }
+//        return resultSet;
+//    }
 
 }
