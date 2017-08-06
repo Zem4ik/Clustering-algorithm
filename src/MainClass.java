@@ -25,13 +25,12 @@ public class MainClass {
     private static Map<String, ArrayList<String>> clusters;
     private static SortedSet<Pair<Pair<String, String>, Double>> queriesSimilarity;
     private static SortedSet<Pair<Pair<String, String>, Double>> sitesSimilarity;
-    private static long startTime;
 
     public static void main(String[] args) throws IOException {
         if (args == null || args.length == 0) {
             args = FILE_PATHS;
         }
-        startTime = System.currentTimeMillis();
+        long startTime = System.currentTimeMillis();
 
         queries = new HashMap<>();
         sites = new HashMap<>();
@@ -47,37 +46,37 @@ public class MainClass {
             clusters.put(entry.getKey(), new ArrayList<>());
         }
 
-        preprocessing(queries, sites, queriesSimilarity);
-        System.out.println("queries preprocessing finished, time: " +
-                        (System.currentTimeMillis() - startTime) / 1000.0 + " sec");
-        preprocessing(sites, queries, sitesSimilarity);
-        System.out.println("sites preprocessing finished, time: " +
-                (System.currentTimeMillis() - startTime) / 1000.0 + " sec");
-
-
-//        while (doIteration()) {
-//            if ((clusters.size() / 1000.0) % 1 == 0) {
-//                System.out.println(clusters.size() + " time: " +
+//        preprocessing(queries, sites, queriesSimilarity);
+//        System.out.println("queries preprocessing finished, time: " +
 //                        (System.currentTimeMillis() - startTime) / 1000.0 + " sec");
-//            }
-//        }
-//
-//        BufferedWriter bufferedWriter = new BufferedWriter(
-//                new OutputStreamWriter(new FileOutputStream(new File("results.txt")), "UTF-8"));
-//
-//        queries.clear();
-//        sites.clear();
-//        for (Map.Entry<String, ArrayList<String>> entry : clusters.entrySet()) {
-//            bufferedWriter.write(entry.getKey());
-//            bufferedWriter.newLine();
-//            for (String query : entry.getValue()) {
-//                bufferedWriter.write(query);
-//                bufferedWriter.newLine();
-//            }
-//            bufferedWriter.newLine();
-//        }
-//        bufferedWriter.close();
-//
+//        preprocessing(sites, queries, sitesSimilarity);
+//        System.out.println("sites preprocessing finished, time: " +
+//                (System.currentTimeMillis() - startTime) / 1000.0 + " sec");
+
+
+        while (doIteration()) {
+            if ((clusters.size() / 1000.0) % 1 == 0) {
+                System.out.println(clusters.size() + " time: " +
+                        (System.currentTimeMillis() - startTime) / 1000.0 + " sec");
+            }
+        }
+
+        BufferedWriter bufferedWriter = new BufferedWriter(
+                new OutputStreamWriter(new FileOutputStream(new File("results.txt")), "UTF-8"));
+
+        queries.clear();
+        sites.clear();
+        for (Map.Entry<String, ArrayList<String>> entry : clusters.entrySet()) {
+            bufferedWriter.write(entry.getKey());
+            bufferedWriter.newLine();
+            for (String query : entry.getValue()) {
+                bufferedWriter.write(query);
+                bufferedWriter.newLine();
+            }
+            bufferedWriter.newLine();
+        }
+        bufferedWriter.close();
+
 //        System.out.println("Total queries: " + queries.size());
 //        System.out.println("Total sites: " + sites.size());
         System.out.println("working time: " + (System.currentTimeMillis() - startTime) / 1000.0 + " sec");
@@ -127,7 +126,6 @@ public class MainClass {
         Set<Pair<String, String>> precessedPairs = new HashSet<>();
 
         for (Map.Entry<String, Map<String, Integer>> startingEntry : firstMap.entrySet()) {
-            if ((precessedPairs.size() / 1000.0) % 1 == 0) System.out.println(precessedPairs.size() + " time: " + (System.currentTimeMillis() - startTime) / 1000.0 + " sec");
             Set<String> neighboringQueries = getNeighboringQueries(startingEntry, secondMap);
             for (String neighboringQuery : neighboringQueries) {
                 Pair<String, String> pair1 = new Pair<>(startingEntry.getKey(), neighboringQuery);
@@ -146,7 +144,6 @@ public class MainClass {
 
         Pair<String, String> queriesPair = resultPair.getFirst();
         double maxSimilarity = resultPair.getSecond();
-        if (maxSimilarity < 1) System.out.println(maxSimilarity);
 
         if (maxSimilarity == -1 || maxSimilarity < 0.5) {
             return false;
