@@ -25,12 +25,13 @@ public class MainClass {
     private static Map<String, ArrayList<String>> clusters;
     private static SortedSet<Pair<Pair<String, String>, Double>> queriesSimilarity;
     private static SortedSet<Pair<Pair<String, String>, Double>> sitesSimilarity;
+    private static long startTime;
 
     public static void main(String[] args) throws IOException {
         if (args == null || args.length == 0) {
             args = FILE_PATHS;
         }
-        long startTime = System.currentTimeMillis();
+        startTime = System.currentTimeMillis();
 
         queries = new HashMap<>();
         sites = new HashMap<>();
@@ -125,7 +126,8 @@ public class MainClass {
                                       SortedSet<Pair<Pair<String, String>, Double>> resultSet) {
         Set<Pair<String, String>> precessedPairs = new HashSet<>();
 
-        for (Map.Entry<String, Map<String, Integer>> startingEntry : queries.entrySet()) {
+        for (Map.Entry<String, Map<String, Integer>> startingEntry : firstMap.entrySet()) {
+            if ((precessedPairs.size() / 1000.0) % 1 == 0) System.out.println(precessedPairs.size() + " time: " + (System.currentTimeMillis() - startTime) / 1000.0 + " sec");
             Set<String> neighboringQueries = getNeighboringQueries(startingEntry, secondMap);
             for (String neighboringQuery : neighboringQueries) {
                 Pair<String, String> pair1 = new Pair<>(startingEntry.getKey(), neighboringQuery);
