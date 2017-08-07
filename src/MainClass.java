@@ -20,65 +20,72 @@ public class MainClass {
 //            "user-ct-test-collection-10.txt"
     };
 
+    //maps query string (vertex of bipartite graph) to another map, which contains incident edges
     private static Map<String, Map<String, Integer>> queries;
+    //maps site string (vertex of bipartite graph) to another map, which contains incident edges
     private static Map<String, Map<String, Integer>> sites;
+    //maps query to list of other queries in its cluster
     private static Map<String, ArrayList<String>> clusters;
-    private static SortedSet<Pair<Pair<String, String>, Double>> queriesSimilarity;
-    private static SortedSet<Pair<Pair<String, String>, Double>> sitesSimilarity;
 
+    /**
+     * This is main class which calculates clusters from search logs
+     * @param args list of files with logs
+     * @throws IOException if error occurs while working with files
+     */
     public static void main(String[] args) throws IOException {
+        //setting default list of files if null passed
         if (args == null || args.length == 0) {
             args = FILE_PATHS;
         }
+        //saving time of starting program
         long startTime = System.currentTimeMillis();
 
+        //initializing maps
         queries = new HashMap<>();
         sites = new HashMap<>();
         clusters = new HashMap<>();
-        queriesSimilarity = new TreeSet<>(Comparator.comparingDouble(Pair::getSecond));
-        sitesSimilarity = new TreeSet<>(Comparator.comparingDouble(Pair::getSecond));
 
+        //reading logs and creating graph
         for (String filePath : args) {
             processFile(filePath);
         }
 
+        //for each query creating empty list, it will be used while uniting vertices
         for (Map.Entry<String, Map<String, Integer>> entry : queries.entrySet()) {
             clusters.put(entry.getKey(), new ArrayList<>());
         }
 
-//        preprocessing(queries, sites, queriesSimilarity);
-//        System.out.println("queries preprocessing finished, time: " +
-//                        (System.currentTimeMillis() - startTime) / 1000.0 + " sec");
-//        preprocessing(sites, queries, sitesSimilarity);
-//        System.out.println("sites preprocessing finished, time: " +
-//                (System.currentTimeMillis() - startTime) / 1000.0 + " sec");
-
-
+        //do iteration while united vertices have enough similarity
         while (doIteration()) {
+            //debugging information about process
             if ((clusters.size() / 1000.0) % 1 == 0) {
                 System.out.println(clusters.size() + " time: " +
                         (System.currentTimeMillis() - startTime) / 1000.0 + " sec");
             }
         }
 
-        BufferedWriter bufferedWriter = new BufferedWriter(
-                new OutputStreamWriter(new FileOutputStream(new File("results.txt")), "UTF-8"));
-
+        //information about graph
+        System.out.println("Total queries: " + queries.size());
+        System.out.println("Total sites: " + sites.size());
+        //clearing two unnecessary maps
         queries.clear();
         sites.clear();
-        for (Map.Entry<String, ArrayList<String>> entry : clusters.entrySet()) {
-            bufferedWriter.write(entry.getKey());
-            bufferedWriter.newLine();
-            for (String query : entry.getValue()) {
-                bufferedWriter.write(query);
+
+        //writing results of clustering to file
+        try (BufferedWriter bufferedWriter = new BufferedWriter(
+                new OutputStreamWriter(new FileOutputStream(new File("results.txt")), "UTF-8"))) {
+            for (Map.Entry<String, ArrayList<String>> entry : clusters.entrySet()) {
+                bufferedWriter.write(entry.getKey());
+                bufferedWriter.newLine();
+                for (String query : entry.getValue()) {
+                    bufferedWriter.write(query);
+                    bufferedWriter.newLine();
+                }
                 bufferedWriter.newLine();
             }
-            bufferedWriter.newLine();
         }
-        bufferedWriter.close();
 
-//        System.out.println("Total queries: " + queries.size());
-//        System.out.println("Total sites: " + sites.size());
+        //showing working time
         System.out.println("working time: " + (System.currentTimeMillis() - startTime) / 1000.0 + " sec");
     }
 
