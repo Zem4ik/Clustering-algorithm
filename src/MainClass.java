@@ -7,6 +7,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class MainClass {
+
+    //default files to be processed
     private static String[] FILE_PATHS = {
             "user-ct-test-collection-01.txt",
 //            "user-ct-test-collection-02.txt",
@@ -29,6 +31,7 @@ public class MainClass {
 
     /**
      * This is main class which calculates clusters from search logs
+     *
      * @param args list of files with logs
      * @throws IOException if error occurs while working with files
      */
@@ -89,8 +92,15 @@ public class MainClass {
         System.out.println("working time: " + (System.currentTimeMillis() - startTime) / 1000.0 + " sec");
     }
 
+    /**
+     * Reads logs from file and puts new vertices in graph
+     *
+     * @param filePath file path
+     */
     private static void processFile(String filePath) {
         long startTime = System.currentTimeMillis();
+
+        //creating parser for paring file
         QueryCollectionParser queryCollectionParser = new QueryCollectionParser();
         try {
             queryCollectionParser.openFile(filePath);
@@ -101,6 +111,8 @@ public class MainClass {
         Query query = new QueryOnly();
         int ClickThrough_number = 0;
         int QueryOnly_number = 0;
+
+        //reading all queries
         for (int i = 1; query != null; ++i) {
             try {
                 query = queryCollectionParser.nextQuery();
@@ -120,6 +132,8 @@ public class MainClass {
                 e.printStackTrace();
             }
         }
+
+        //showing information about file processing
         System.out.println("statistic for file: " + filePath);
         System.out.println("Query.ClickThrough: " + ClickThrough_number);
         System.out.println("Query.QueryOnly: " + QueryOnly_number);
@@ -127,35 +141,24 @@ public class MainClass {
         System.out.println();
     }
 
-    private static void preprocessing(Map<String, Map<String, Integer>> firstMap,
-                                      Map<String, Map<String, Integer>> secondMap,
-                                      SortedSet<Pair<Pair<String, String>, Double>> resultSet) {
-        Set<Pair<String, String>> precessedPairs = new HashSet<>();
-
-        for (Map.Entry<String, Map<String, Integer>> startingEntry : firstMap.entrySet()) {
-            Set<String> neighboringQueries = getNeighboringQueries(startingEntry, secondMap);
-            for (String neighboringQuery : neighboringQueries) {
-                Pair<String, String> pair1 = new Pair<>(startingEntry.getKey(), neighboringQuery);
-                Pair<String, String> pair2 = new Pair<>(startingEntry.getKey(), neighboringQuery);
-                if (!precessedPairs.contains(pair1) && !precessedPairs.contains(pair2)) {
-                    double similarity = calculateSimilarity(startingEntry.getValue(), firstMap.get(neighboringQuery));
-                    precessedPairs.add(pair1);
-                    resultSet.add(new Pair<>(pair1, similarity));
-                }
-            }
-        }
-    }
-
+    /**
+     * Find and unites two most similar queries and then two most similar sites
+     *
+     * @return method returns true, if similarity of queries enough for uniting
+     */
     private static boolean doIteration() {
-        Pair<Pair<String, String>, Double> resultPair = getMostSimilarVertex(queries, sites);
+        //finding two most similar queries
+        Pair<Pair<String, String>, Double> resultPair = getMostSimilarVertices(queries, sites);
 
         Pair<String, String> queriesPair = resultPair.getFirst();
         double maxSimilarity = resultPair.getSecond();
 
+        //if similarity isn't big enough
         if (maxSimilarity == -1 || maxSimilarity < 0.5) {
             return false;
         }
 
+        //uniting clusters of two queries
         final String finalSecondString = queriesPair.getSecond();
         clusters.compute(queriesPair.getFirst(), (k, v) -> {
             ArrayList<String> arrayList = clusters.remove(finalSecondString);
@@ -166,35 +169,55 @@ public class MainClass {
             return v;
         });
 
+        //uniting this queries in graph
         uniteVertices(queries, sites, queriesPair.getFirst(), queriesPair.getSecond());
 
-        resultPair = getMostSimilarVertex(sites, queries);
+        //finding and uniting two most similar sites
+        resultPair = getMostSimilarVertices(sites, queries);
         uniteVertices(sites, queries, resultPair.getFirst().getFirst(), resultPair.getFirst().getSecond());
         return true;
     }
 
+    /**
+     * Unites two given vertices
+     *
+     * @param firstMap     map where this vertices are kept (queries in {@link MainClass#queries}
+     *                     and sites in {@link MainClass#sites}
+     * @param secondMap    another map(for queries it's {@link MainClass#queries}
+     *                     and for sites it's {@link MainClass#sites}
+     * @param firstString  string associated with first vertex
+     * @param secondString string associated with second vertex
+     */
     private static void uniteVertices(Map<String, Map<String, Integer>> firstMap,
-                               Map<String, Map<String, Integer>> secondMap,
-                               String firstString,
-                               String secondString) {
+                                      Map<String, Map<String, Integer>> secondMap,
+                                      String firstString,
+                                      String secondString) {
+        //find two sets of vertices which are connected with first vertex
         Set<String> connectedWithFirst = firstMap.get(firstString).keySet();
+        //find two sets of vertices which are connected with second vertex
         Set<String> connectedWithSecond = firstMap.get(secondString).keySet();
 
+        //calculating set of vertices which are connected with both vertices
         List<String> connectedWithBoth = new ArrayList<>(connectedWithFirst);
         connectedWithBoth.retainAll(connectedWithSecond);
 
+        //calculating set of vertices which are connected with second vertex
+        //but not connected wit first
         List<String> connectedWithSecondOnly = new ArrayList<>(connectedWithSecond);
         connectedWithSecondOnly.removeAll(connectedWithFirst);
 
+        //uniting edges which are incident to the same vertex in second part
         for (String vertex : connectedWithBoth) {
             Map<String, Integer> map = secondMap.get(vertex);
             map.compute(firstString, (k, v) -> v + map.remove(secondString));
         }
+        //redirecting edges to the first vertex in second part
         for (String vertex : connectedWithSecondOnly) {
             Map<String, Integer> map = secondMap.get(vertex);
             map.put(firstString, map.remove(secondString));
         }
 
+        //updating first part
         Map<String, Integer> newMap = Stream.of(firstMap.get(firstString), firstMap.get(secondString))
                 .map(Map::entrySet)
                 .flatMap(Collection::stream)
@@ -208,15 +231,29 @@ public class MainClass {
         firstMap.put(firstString, newMap);
     }
 
+    /**
+     * Finds two vertices between queries or sites with biggest vale of
+     * similarity function
+     *
+     * @param firstMap  map where this vertices are kept (queries in {@link MainClass#queries}
+     *                  and sites in {@link MainClass#sites}
+     * @param secondMap another map(for queries it's {@link MainClass#queries}
+     *                  and for sites it's {@link MainClass#sites}
+     * @return {@link Pair} of {@link Pair} of strings associated with vertices
+     * and value of similarity
+     */
     private static Pair<Pair<String, String>, Double>
-    getMostSimilarVertex(Map<String, Map<String, Integer>> firstMap,
-                         Map<String, Map<String, Integer>> secondMap) {
+    getMostSimilarVertices(Map<String, Map<String, Integer>> firstMap,
+                           Map<String, Map<String, Integer>> secondMap) {
         Pair<String, String> pair = null;
         double maxSimilarity = -1;
+        //cycle across all vertices in part
         for (Map.Entry<String, Map<String, Integer>> startingEntry : firstMap.entrySet()) {
-            Set<String> neighboringQueries = getNeighboringQueries(startingEntry, secondMap);
+            //calculating similarity with each neighbour vertex
+            Set<String> neighboringQueries = getAdjacentVertices(startingEntry, secondMap);
             for (String neighboringQuery : neighboringQueries) {
                 double similarity = calculateSimilarity(startingEntry.getValue(), firstMap.get(neighboringQuery));
+                //finding the most similar
                 if (pair == null) {
                     pair = new Pair<>(startingEntry.getKey(), neighboringQuery);
                     maxSimilarity = similarity;
@@ -225,14 +262,22 @@ public class MainClass {
                     pair.setSecond(neighboringQuery);
                     maxSimilarity = similarity;
                 }
-                if (maxSimilarity == 1) return  new Pair<>(pair, maxSimilarity);
+                if (maxSimilarity == 1) return new Pair<>(pair, maxSimilarity);
             }
         }
         return new Pair<>(pair, maxSimilarity);
     }
 
-    private static Set<String> getNeighboringQueries(Map.Entry<String, Map<String, Integer>> startingEntry,
-                                                     Map<String, Map<String, Integer>> secondMap) {
+    /**
+     * Finds all vertices in the same part which are adjacent to the same vertices
+     * from another part
+     *
+     * @param startingEntry map with edges of initial vertex
+     * @param secondMap     map with vertices from second part
+     * @return all adjacent vertices
+     */
+    private static Set<String> getAdjacentVertices(Map.Entry<String, Map<String, Integer>> startingEntry,
+                                                   Map<String, Map<String, Integer>> secondMap) {
         Set<String> neighboringQueries = new HashSet<>();
         Map<String, Integer> map = startingEntry.getValue();
         for (Map.Entry<String, Integer> firstEntry : map.entrySet()) {
@@ -245,6 +290,15 @@ public class MainClass {
         return neighboringQueries;
     }
 
+    /**
+     * Calculates similarity between two vertices
+     *
+     * @param firstMap  map where this vertices are kept (queries in {@link MainClass#queries}
+     *                  and sites in {@link MainClass#sites}
+     * @param secondMap another map(for queries it's {@link MainClass#queries}
+     *                  and for sites it's {@link MainClass#sites}
+     * @return valuse of similarity function
+     */
     private static double calculateSimilarity(Map<String, Integer> firstMap, Map<String, Integer> secondMap) {
         double sameDocuments = 0;
         long firstDocuments, secondDocuments;
@@ -260,18 +314,5 @@ public class MainClass {
         }
         return sameDocuments / (firstDocuments + secondDocuments);
     }
-
-//    @Deprecated
-//    private static SortedSet<Pair<String, Double>> getSimilarQueries(Map.Entry<String, Map<String, Integer>> startingEntry) {
-//        SortedSet<Pair<String, Double>> resultSet = new TreeSet<>(Comparator.comparing(Pair::getSecond));
-//        Set<String> neighboringQueries = getNeighboringQueries(startingEntry);
-//        for (String neighboringQuery : neighboringQueries) {
-//            double similarity = calculateSimilarity(startingEntry.getValue(), queries.get(neighboringQuery));
-//            if (similarity > 0.001) {
-//                resultSet.add(new Pair<>(neighboringQuery, similarity));
-//            }
-//        }
-//        return resultSet;
-//    }
 
 }
